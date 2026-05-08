@@ -185,8 +185,9 @@ type RoomBroadcast struct {
 //
 // This split ensures that a slow GameServer consumer never blocks room broadcasts.
 type Hub struct {
-	mu      sync.RWMutex
-	clients map[string]*Client // keyed by Client.ID
+	mu             sync.RWMutex
+	clients        map[string]*Client // keyed by Client.ID
+	clientByPlayer map[ds.ID]*Client
 
 	register   chan *Client
 	unregister chan *Client
@@ -199,12 +200,13 @@ type Hub struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[string]*Client),
-		register:   make(chan *Client, 16),
-		unregister: make(chan *Client, 16),
-		dispatch:   make(chan Envelope, 256),
-		broadcast:  make(chan RoomBroadcast, 256),
-		Events:     make(chan Event, 256),
+		clients:        make(map[string]*Client),
+		clientByPlayer: make(map[ds.ID]*Client),
+		register:       make(chan *Client, 16),
+		unregister:     make(chan *Client, 16),
+		dispatch:       make(chan Envelope, 256),
+		broadcast:      make(chan RoomBroadcast, 256),
+		Events:         make(chan Event, 256),
 	}
 }
 
@@ -222,6 +224,7 @@ func (h *Hub) registryLoop() {
 		case c := <-h.register:
 			h.mu.Lock()
 			h.clients[c.ID] = c
+			h.clientByPlayer[c.PlayerID] = c
 			h.mu.Unlock()
 			log.Printf("[hub] connected: %s (player %s)", c.ID, c.PlayerID)
 			h.Events <- Event{Kind: EventConnected, Client: c}
@@ -230,6 +233,7 @@ func (h *Hub) registryLoop() {
 			h.mu.Lock()
 			if _, ok := h.clients[c.ID]; ok {
 				delete(h.clients, c.ID)
+				delete(h.clientByPlayer, c.PlayerID)
 				close(c.send)
 			}
 			h.mu.Unlock()
@@ -265,12 +269,8 @@ func (h *Hub) Broadcast(roomID string, msg OutMessage) {
 func (h *Hub) ClientByPlayerID(playerID ds.ID) *Client {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	for _, c := range h.clients {
-		if c.PlayerID == playerID {
-			return c
-		}
-	}
-	return nil
+
+	return h.clientByPlayer[playerID]
 }
 
 // ─── HTTP handler ─────────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import (
 	"github.com/ognev-dev/goplease/game/unit"
 )
 
-const matchmakingTimeout = 20 * time.Second
+const matchmakingTimeout = 1 * time.Second
 
 // MatchCallback is called on the searching player's goroutine when a room is ready.
 type MatchCallback func(room *game.Room, playerIndex int)
@@ -72,6 +72,7 @@ func (mm *Matchmaker) Enqueue(playerID ds.ID, cb MatchCallback) {
 		cb:       cb,
 		at:       time.Now(),
 	})
+
 	log.Printf("[match] player %s queued (%d in queue)", playerID, len(mm.queue))
 }
 

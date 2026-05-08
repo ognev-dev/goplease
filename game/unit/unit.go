@@ -19,24 +19,24 @@ type Template struct {
 }
 
 type Unit struct {
-	ID         ds.ID
-	TemplateID int
-	OwnerID    ds.ID
-	Name       string
+	ID         ds.ID  `json:"id"`
+	TemplateID int    `json:"template_id"`
+	OwnerID    ds.ID  `json:"owner_id"`
+	Name       string `json:"name"`
 
-	MaxHP         int
-	CurrentHP     int
-	CurrentShield int
+	MaxHP         int `json:"max_hp"`
+	CurrentHP     int `json:"current_hp"`
+	CurrentShield int `json:"current_shield"`
 
-	AP int // Action Points
-	MP int // Move Points
+	AP int `json:"ap"` // Action Points
+	MP int `json:"mp"` // Move Points
 
 	// board position, -1 - in hand
-	PosRow int
-	PosCol int
+	Row int `json:"row"`
+	Col int `json:"col"`
 
-	Abilities []ability.ID
-	Cooldowns map[ability.ID]int
+	Abilities []ability.ID       `json:"abilities"`
+	Cooldowns map[ability.ID]int `json:"cooldowns"`
 }
 
 func NewUnitFromTemplate(t Template, playerID ds.ID) *Unit {
@@ -50,12 +50,12 @@ func NewUnitFromTemplate(t Template, playerID ds.ID) *Unit {
 		CurrentShield: t.Shield,
 		AP:            t.ActionPoints,
 		MP:            t.MovePoints,
-		PosRow:        -1,
-		PosCol:        -1,
+		Row:           -1,
+		Col:           -1,
 		Abilities:     t.Abilities,
 		Cooldowns:     make(map[ability.ID]int),
 	}
 }
 
 func (u *Unit) IsAlive() bool { return u.CurrentHP > 0 }
-func (u *Unit) InHand() bool  { return u.PosRow == -1 }
+func (u *Unit) InHand() bool  { return u.Row == -1 }

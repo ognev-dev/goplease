@@ -6,14 +6,11 @@ import (
 )
 
 type Player struct {
-	ID          ds.ID
-	Name        string
-	IsBot       bool
-	PlayerIndex int // 0 or 1
-
-	Units       []*unit.Unit
-	KillCount   int
-	DamageDealt int
+	ID          ds.ID        `json:"id"`
+	Name        string       `json:"name"`
+	IsBot       bool         `json:"is_bot"`
+	PlayerIndex int          `json:"-"`     // 0 or 1
+	Units       []*unit.Unit `json:"units"` // units at hand
 }
 
 func NewPlayer(id ds.ID, name string, index int, isBot bool, units []*unit.Unit) *Player {
@@ -33,9 +30,9 @@ func (p *Player) HasUnits(board *Board) bool {
 		return true
 	}
 
-	for col := 0; col < BoardCols; col++ {
+	for col := 0; col < BoardColumns; col++ {
 		for row := 0; row < BoardRows; row++ {
-			u := board.At(col, row)
+			u := board.UnitAt(col, row)
 			if u != nil && u.OwnerID == p.ID {
 				return true
 			}

@@ -107,26 +107,18 @@ func (gs *GameServer) onMessage(c *Client, msg InMessage) {
 
 func (gs *GameServer) prepareNewGame(c *Client) {
 	gs.matchmaker.Enqueue(c.PlayerID, func(room *game.Room, playerIndex int) {
-		// This callback is called from the matchmaker goroutine when a match is ready.
-		c.RoomID = room.ID
-
-		// Also set the room on the opponent's client (if they're human).
-		for _, p := range room.Players {
-			if p.ID != c.PlayerID {
-				if opp := gs.hub.ClientByPlayerID(p.ID); opp != nil {
-					opp.RoomID = room.ID
-					opp.Send(OutMessage{
-						Action: NewGameAction,
-						Data:   newGamePayload(room, p.ID),
-					})
-				}
+		for idx, p := range room.Players {
+			client := gs.hub.ClientByPlayerID(p.ID)
+			if client == nil {
+				continue
 			}
-		}
 
-		c.Send(OutMessage{
-			Action: NewGameAction,
-			Data:   newGamePayload(room, c.PlayerID),
-		})
+			client.RoomID = room.ID
+			client.Send(OutMessage{
+				Action: NewGameAction,
+				Data:   newGamePayload(room, idx),
+			})
+		}
 	})
 
 	c.Send(OutMessage{Action: SearchingOppAction, Data: nil})
@@ -204,14 +196,29 @@ func errMsg(msg string) OutMessage {
 	return OutMessage{Action: "error", Data: map[string]string{"message": msg}}
 }
 
-func newGamePayload(room *game.Room, playerID ds.ID) game.NewGamePayload {
-	return game.NewGamePayload{
-		RoomID:     room.ID,
-		IsYourTurn: false,
-		Board:      game.Board{},
-		Units:      nil,
-		Opponent:   nil,
+func newGamePayload(room *game.Room, myIndex int) game.NewGamePayload {
+	var preparedBoard game.Board
+
+	// set safe-zone for both players
+	for r := 0; r < game.BoardRows; r++ {
+		for c := 0; c < game.BoardColumns; c++ {
+			cell := *room.Board[r][c]
+			if myIndex == 0 {
+				cell.IsSafeZone = c < game.SafeZoneSize
+			} else {
+				cell.IsSafeZone = c >= (game.BoardColumns - game.SafeZoneSize)
+			}
+
+			preparedBoard[r][c] = &cell
+		}
 	}
 
-	// TODO
+	return game.NewGamePayload{
+		RoomID:   room.ID,
+		Phase:    room.Phase,
+		IsMyTurn: room.ActivePlayer == myIndex,
+		Board:    preparedBoard,
+		Player:   room.Players[myIndex],
+		Opponent: room.Players[1-myIndex].Name,
+	}
 }

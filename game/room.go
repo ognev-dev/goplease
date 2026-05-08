@@ -2,6 +2,7 @@ package game
 
 import (
 	"errors"
+	"math/rand"
 	"sync"
 
 	"github.com/google/uuid"
@@ -44,8 +45,9 @@ func NewRoom(p1, p2 *Player) *Room {
 		ID:           uuid.NewString(),
 		Players:      [2]*Player{p1, p2},
 		CurrentTurn:  0,
-		ActivePlayer: 0,
+		ActivePlayer: rand.Intn(2),
 		Phase:        PhaseUnitPlacement,
+		Board:        NewBoard(),
 	}
 }
 
@@ -71,7 +73,7 @@ func (r *Room) PlaceUnit(playerID ds.ID, place PlacementAction) error {
 }
 
 // RecallUnit removes a placed unit back to hand (only during placement phase).
-func (r *Room) RecallUnit(playerID ds.ID, col, row int) error {
+func (r *Room) RecallUnit(playerID ds.ID, row, col int) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -82,11 +84,11 @@ func (r *Room) RecallUnit(playerID ds.ID, col, row int) error {
 	if r.Phase != PhaseUnitPlacement || r.ActivePlayer != idx {
 		return errors.New("not your turn to place")
 	}
-	u := r.Board.At(col, row)
+	u := r.Board.UnitAt(row, col)
 	if u == nil || u.OwnerID != playerID {
 		return errors.New("no owned unit at that cell")
 	}
-	r.Board.Clear(col, row)
+	r.Board.ClearUnit(row, col)
 
 	return nil
 }
@@ -110,8 +112,6 @@ func (r *Room) EndTurn(playerID ds.ID) (*TurnResult, error) {
 	return nil, nil
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 func (r *Room) playerByID(id ds.ID) (*Player, int) {
 	for i, p := range r.Players {
 		if p.ID == id {
@@ -119,37 +119,4 @@ func (r *Room) playerByID(id ds.ID) (*Player, int) {
 		}
 	}
 	return nil, -1
-}
-
-func (r *Room) checkEndConditions() (over bool, winner *Player, reason EndReason) {
-	p0 := r.Players[0]
-	p1 := r.Players[1]
-	p0Alive := p0.HasUnits(&r.Board)
-	p1Alive := p1.HasUnits(&r.Board)
-
-	if !p0Alive || !p1Alive {
-		if p0Alive {
-			return true, p0, EndNoUnits
-		}
-		if p1Alive {
-			return true, p1, EndNoUnits
-		}
-		// Both dead at same time — pick by score
-		return true, r.scoreWinner(), EndNoUnits
-	}
-
-	if r.CurrentTurn >= MaxTurns {
-		return true, r.scoreWinner(), EndTurnLimit
-	}
-	return false, nil, ""
-}
-
-func (r *Room) scoreWinner() *Player {
-	p0, p1 := r.Players[0], r.Players[1]
-	s0 := p0.KillCount*3 + p0.DamageDealt
-	s1 := p1.KillCount*3 + p1.DamageDealt
-	if s0 >= s1 {
-		return p0
-	}
-	return p1
 }
